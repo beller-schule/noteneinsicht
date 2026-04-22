@@ -212,9 +212,17 @@ async function deriveKey(password, salt) {
   );
 }
 
+// Uint8Array sicher zu Base64 (kein Stack Overflow bei großen Daten)
+function fromBase64(b64) {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
 async function decryptFile(raw, password) {
   if (!raw.startsWith(ENC_MAGIC)) return JSON.parse(raw); // plain JSON
-  const bytes = Uint8Array.from(atob(raw.slice(ENC_MAGIC.length)), c => c.charCodeAt(0));
+  const bytes = fromBase64(raw.slice(ENC_MAGIC.length));
   const salt = bytes.slice(0, 16), iv = bytes.slice(16, 28), ct = bytes.slice(28);
   const key = await deriveKey(password, salt);
   try {
@@ -295,7 +303,7 @@ function loadFile(file) {
       alert('Die Datei konnte nicht gelesen werden. Stelle sicher, dass es eine gültige .lk.enc- oder .json-Datei ist.');
     }
   };
-  r.readAsText(file);
+    r.readAsText(file, 'UTF-8');
 }
 
 function promptDecryptPw() {
