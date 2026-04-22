@@ -177,11 +177,11 @@ body::after{
     <div class="drop-zone" id="drop-zone">
       <span class="dz-icon">📋</span>
       <div class="dz-title">Datei hierher ziehen</div>
-      <div class="dz-sub">oder klicken zum Auswählen<br><code style="font-size:11px;color:var(--accent)">korrektur_nachname_vorname_klasse_datum.json</code></div>
-      <input type="file" accept=".json" onchange="loadFile(this.files[0])">
+      <div class="dz-sub">oder klicken zum Auswählen<br><code style="font-size:11px;color:var(--accent)">korrektur_name_klasse_datum.lk.enc</code></div>
+      <input type="file" accept=".lk.enc,.json" onchange="loadFile(this.files[0])">
     </div>
     <div class="dz-hint">
-      ℹ️ Diese Datei enthält ausschließlich <strong>deine eigenen</strong> Antworten und die Bewertung deiner Lehrkraft. Keine anderen Schülerdaten sind enthalten.
+      🔒 Deine Datei ist mit <strong>AES-256</strong> verschlüsselt. Das Passwort erhältst du von deiner Lehrkraft. Die Datei enthält ausschließlich <strong>deine eigenen</strong> Daten — keine anderen Schülerdaten.
     </div>
   </div>
 </div>
@@ -198,6 +198,33 @@ body::after{
 </div>
 
 <script>
+// ══════════════════════════════════════════
+// AES-256-GCM DECRYPTION (Web Crypto API)
+// ══════════════════════════════════════════
+const ENC_MAGIC = 'LKENC1:';
+
+async function deriveKey(password, salt) {
+  const enc = new TextEncoder();
+  const km = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name:'PBKDF2', salt, iterations:310000, hash:'SHA-256' },
+    km, { name:'AES-GCM', length:256 }, false, ['decrypt']
+  );
+}
+
+async function decryptFile(raw, password) {
+  if (!raw.startsWith(ENC_MAGIC)) return JSON.parse(raw); // plain JSON
+  const bytes = Uint8Array.from(atob(raw.slice(ENC_MAGIC.length)), c => c.charCodeAt(0));
+  const salt = bytes.slice(0, 16), iv = bytes.slice(16, 28), ct = bytes.slice(28);
+  const key = await deriveKey(password, salt);
+  try {
+    const plain = await crypto.subtle.decrypt({ name:'AES-GCM', iv }, key, ct);
+    return JSON.parse(new TextDecoder().decode(plain));
+  } catch {
+    throw new Error('Falsches Passwort oder beschädigte Datei.');
+  }
+}
+
 // ══════════════════════════════════════════
 // GRADE TABLE
 // ══════════════════════════════════════════
@@ -242,20 +269,63 @@ function goBack() {
 function loadFile(file) {
   if (!file) return;
   const r = new FileReader();
-  r.onload = e => {
+  r.onload = async e => {
+    const raw = e.target.result;
+    let data;
     try {
-      const data = JSON.parse(e.target.result);
-      // Accept individual correction file (has .student)
+      if (raw.startsWith(ENC_MAGIC)) {
+        // encrypted — ask for password
+        const pw = await promptDecryptPw();
+        if (pw === null) return; // cancelled
+        try {
+          data = await decryptFile(raw, pw);
+        } catch {
+          alert('Falsches Passwort. Bitte frag deine Lehrkraft nach dem richtigen Passwort.');
+          return;
+        }
+      } else {
+        data = JSON.parse(raw);
+      }
       if (!data.student || !data.exam) {
         alert('Diese Datei ist keine gültige Korrekturdatei.\nBitte lade die Datei, die du von deiner Lehrkraft erhalten hast.');
         return;
       }
       render(data);
     } catch {
-      alert('Die Datei konnte nicht gelesen werden. Stelle sicher, dass es eine .json-Datei ist.');
+      alert('Die Datei konnte nicht gelesen werden. Stelle sicher, dass es eine gültige .lk.enc- oder .json-Datei ist.');
     }
   };
   r.readAsText(file);
+}
+
+function promptDecryptPw() {
+  return new Promise(resolve => {
+    // simple inline prompt using a modal
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:999;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:24px';
+    overlay.innerHTML = `
+      <div style="background:#13151e;border:1px solid #262a3a;border-radius:16px;padding:36px;max-width:380px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.6)">
+        <div style="font-size:32px;margin-bottom:14px">🔓</div>
+        <h2 style="font-family:'Syne',sans-serif;font-size:19px;font-weight:800;margin-bottom:8px">Datei entschlüsseln</h2>
+        <p style="color:#6b7191;font-size:14px;margin-bottom:20px">Gib das Passwort ein, das dir deine Lehrkraft mitgeteilt hat.</p>
+        <div style="display:flex;gap:8px">
+          <input id="_dec_pw" type="password" placeholder="Passwort" style="flex:1;background:#191c27;border:1.5px solid #262a3a;border-radius:8px;padding:11px 13px;font-size:15px;color:#e4e7f5;font-family:'Instrument Sans',sans-serif">
+          <button id="_dec_ok" style="padding:11px 18px;border-radius:8px;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;background:#818cf8;color:#fff;border:none;cursor:pointer">→</button>
+        </div>
+        <div id="_dec_err" style="color:#ef4444;font-size:13px;margin-top:10px;min-height:18px"></div>
+        <button id="_dec_cancel" style="background:none;border:none;color:#6b7191;font-size:13px;cursor:pointer;margin-top:12px;text-decoration:underline">Abbrechen</button>
+      </div>`;
+    document.body.appendChild(overlay);
+    const inp = overlay.querySelector('#_dec_pw');
+    inp.focus();
+    const done = val => { document.body.removeChild(overlay); resolve(val); };
+    overlay.querySelector('#_dec_ok').onclick = () => {
+      if (!inp.value) { overlay.querySelector('#_dec_err').textContent = 'Bitte Passwort eingeben.'; return; }
+      done(inp.value);
+    };
+    overlay.querySelector('#_dec_cancel').onclick = () => done(null);
+    inp.onkeydown = e => { if (e.key==='Enter') overlay.querySelector('#_dec_ok').click(); };
+  });
 }
 
 // ══════════════════════════════════════════
