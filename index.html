@@ -278,13 +278,16 @@ function loadFile(file) {
   if (!file) return;
   const r = new FileReader();
   r.onload = async e => {
-    const raw = e.target.result;
+    // ArrayBuffer lesen → rohe Bytes, keine Kodierungsprobleme auf GitHub Pages
+    const arrayBuf = e.target.result;
+    const bytes    = new Uint8Array(arrayBuf);
+    // Als UTF-8 Text dekodieren
+    const raw = new TextDecoder('utf-8').decode(bytes).trim();
     let data;
     try {
       if (raw.startsWith(ENC_MAGIC)) {
-        // encrypted — ask for password
         const pw = await promptDecryptPw();
-        if (pw === null) return; // cancelled
+        if (pw === null) return;
         try {
           data = await decryptFile(raw, pw);
         } catch {
@@ -303,7 +306,7 @@ function loadFile(file) {
       alert('Die Datei konnte nicht gelesen werden. Stelle sicher, dass es eine gültige .lkenc.txt- oder .json-Datei ist.');
     }
   };
-    r.readAsText(file, 'UTF-8');
+  r.readAsArrayBuffer(file);
 }
 
 function promptDecryptPw() {
