@@ -177,8 +177,8 @@ body::after{
     <div class="drop-zone" id="drop-zone">
       <span class="dz-icon">📋</span>
       <div class="dz-title">Datei hierher ziehen</div>
-      <div class="dz-sub">oder klicken zum Auswählen<br><code style="font-size:11px;color:var(--accent)">korrektur_name_klasse_datum.lk.enc</code></div>
-      <input type="file" accept=".lk.enc,.json" onchange="loadFile(this.files[0])">
+      <div class="dz-sub">oder klicken zum Auswählen<br><code style="font-size:11px;color:var(--accent)">korrektur_name_klasse_datum.lkenc.txt</code></div>
+      <input type="file" accept=".lkenc.txt,.json" onchange="loadFile(this.files[0])">
     </div>
     <div class="dz-hint">
       🔒 Deine Datei ist mit <strong>AES-256</strong> verschlüsselt. Das Passwort erhältst du von deiner Lehrkraft. Die Datei enthält ausschließlich <strong>deine eigenen</strong> Daten — keine anderen Schülerdaten.
@@ -300,7 +300,7 @@ function loadFile(file) {
       }
       render(data);
     } catch {
-      alert('Die Datei konnte nicht gelesen werden. Stelle sicher, dass es eine gültige .lk.enc- oder .json-Datei ist.');
+      alert('Die Datei konnte nicht gelesen werden. Stelle sicher, dass es eine gültige .lkenc.txt- oder .json-Datei ist.');
     }
   };
     r.readAsText(file, 'UTF-8');
