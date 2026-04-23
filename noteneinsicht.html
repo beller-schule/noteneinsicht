@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meine Korrektur – WPU 3D-Druck</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0d0f15;--surface:#13151e;--card:#191c27;--card2:#1f2232;
+  --border:#262a3a;--border2:#333749;
+  --ok:#22c55e;--ok-l:rgba(34,197,94,.1);--ok-b:rgba(34,197,94,.25);
+  --err:#ef4444;--err-l:rgba(239,68,68,.09);--err-b:rgba(239,68,68,.3);
+  --warn:#f97316;--warn-l:rgba(249,115,22,.09);
+  --half:#eab308;--half-l:rgba(234,179,8,.1);
+  --accent:#818cf8;--accent-l:rgba(129,140,248,.1);
+  --text:#e4e7f5;--muted:#6b7191;--radius:12px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:'Instrument Sans',sans-serif;min-height:100vh}
+
+/* subtle animated mesh */
+body::before{
+  content:'';position:fixed;inset:0;
+  background:
+    radial-gradient(ellipse 60% 50% at 20% 20%, rgba(129,140,248,.06) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 60% at 80% 80%, rgba(34,197,94,.05) 0%, transparent 60%);
+  pointer-events:none;z-index:0;
+}
+body::after{
+  content:'';position:fixed;inset:0;
+  background-image:linear-gradient(rgba(129,140,248,.025) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(129,140,248,.025) 1px,transparent 1px);
+  background-size:28px 28px;pointer-events:none;z-index:0;
+}
+
+@keyframes rise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.screen{display:none;position:relative;z-index:1}
+.screen.active{display:block}
+
+/* ══ DROP ══ */
+#screen-drop{min-height:100vh;display:none;align-items:center;justify-content:center;padding:24px}
+#screen-drop.active{display:flex}
+.drop-card{background:var(--surface);border:1px solid var(--border);border-radius:22px;padding:52px 48px;max-width:480px;width:100%;text-align:center;box-shadow:0 12px 64px rgba(0,0,0,.55);animation:rise .5s ease}
+.brand{font-family:'Syne',sans-serif;font-size:11px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--accent);display:inline-flex;align-items:center;gap:8px;margin-bottom:24px}
+.brand::before,.brand::after{content:'';width:16px;height:1.5px;background:var(--accent);border-radius:99px}
+.drop-card h1{font-family:'Syne',sans-serif;font-size:30px;font-weight:800;line-height:1.2;margin-bottom:10px}
+.drop-card h1 em{color:var(--ok);font-style:normal}
+.drop-card .sub{color:var(--muted);font-size:14px;line-height:1.65;margin-bottom:32px}
+
+.drop-zone{border:2px dashed var(--border2);border-radius:14px;padding:36px 20px;cursor:pointer;transition:all .22s;position:relative}
+.drop-zone:hover,.drop-zone.drag{border-color:var(--ok);background:rgba(34,197,94,.04);transform:scale(1.01)}
+.drop-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.dz-icon{font-size:38px;margin-bottom:12px;display:block}
+.dz-title{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;margin-bottom:5px}
+.dz-sub{font-size:12px;color:var(--muted);line-height:1.5}
+.dz-hint{margin-top:20px;padding:11px 14px;background:rgba(129,140,248,.07);border:1px solid rgba(129,140,248,.18);border-radius:9px;font-size:12px;color:var(--accent);line-height:1.55;text-align:left}
+
+/* ══ RESULT ══ */
+#screen-result{min-height:100vh;display:none;flex-direction:column}
+#screen-result.active{display:flex}
+
+/* top bar */
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);height:56px;padding:0 24px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:100;box-shadow:0 2px 20px rgba(0,0,0,.4)}
+.tb-brand{font-family:'Syne',sans-serif;font-size:13px;font-weight:800;color:var(--text)}
+.tb-brand span{color:var(--ok)}
+.tb-name{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tb-space{flex:1}
+.tb-back{padding:6px 14px;border-radius:7px;font-family:'Syne',sans-serif;font-size:12px;font-weight:700;border:1px solid var(--border);background:var(--card2);color:var(--muted);cursor:pointer;transition:all .15s}
+.tb-back:hover{border-color:var(--err);color:var(--err)}
+
+/* content */
+.result-body{flex:1;padding:28px 22px 60px;max-width:800px;margin:0 auto;width:100%}
+
+/* hero score card */
+.hero-card{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:32px;margin-bottom:24px;box-shadow:0 6px 32px rgba(0,0,0,.3);animation:rise .45s ease;display:flex;align-items:center;gap:28px;flex-wrap:wrap}
+.hero-ring{position:relative;width:110px;height:110px;flex-shrink:0}
+.hero-ring svg{transform:rotate(-90deg)}
+.ring-bg{fill:none;stroke:var(--border2);stroke-width:9}
+.ring-fill{fill:none;stroke-width:9;stroke-linecap:round;transition:stroke-dashoffset 1.2s cubic-bezier(.4,0,.2,1)}
+.hero-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none}
+.hero-pct{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;line-height:1}
+.hero-pts{font-size:11px;color:var(--muted);margin-top:2px}
+.hero-info{flex:1;min-width:200px}
+.hero-name{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:4px}
+.hero-meta{font-size:13px;color:var(--muted);margin-bottom:14px}
+.hero-grade-wrap{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.hero-grade{font-family:'Syne',sans-serif;font-size:42px;font-weight:800;line-height:1}
+.hero-grade-label{font-size:13px;color:var(--muted);line-height:1.5}
+.grade-desc{font-weight:600;color:var(--text);display:block}
+
+/* progress bar row */
+.prog-row{margin-top:14px;display:flex;flex-direction:column;gap:5px}
+.prog-label{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+.prog-track{height:6px;background:var(--border2);border-radius:99px;overflow:hidden}
+.prog-fill{height:100%;border-radius:99px;transition:width 1s cubic-bezier(.4,0,.2,1)}
+
+/* teacher comment box */
+.teacher-comment-box{background:rgba(129,140,248,.07);border:1px solid rgba(129,140,248,.2);border-radius:var(--radius);padding:16px 18px;margin-bottom:20px;animation:rise .5s ease .15s both}
+.tcb-label{font-family:'Syne',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin-bottom:8px;display:flex;align-items:center;gap:7px}
+.tcb-text{font-size:14px;line-height:1.65;color:var(--text)}
+
+/* section header */
+.section-hdr{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:14px;display:flex;align-items:center;gap:10px}
+.section-hdr::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* question cards */
+.q-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:10px;animation:rise .3s ease both;position:relative;overflow:hidden}
+.q-card::before{content:'';position:absolute;top:0;left:0;width:3px;height:100%;border-radius:99px 0 0 99px}
+.q-card.q-correct::before{background:var(--ok)}
+.q-card.q-wrong::before{background:var(--err)}
+.q-card.q-half::before{background:var(--half)}
+.q-card.q-open::before{background:var(--accent)}
+.q-card.q-empty::before{background:var(--border2)}
+
+.q-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.q-num{font-family:'Syne',sans-serif;font-size:11px;font-weight:700;color:var(--warn);background:var(--warn-l);border:1px solid rgba(249,115,22,.25);border-radius:5px;padding:2px 8px}
+.q-mat{font-family:'Syne',sans-serif;font-size:10px;font-weight:700;border-radius:5px;padding:2px 7px}
+.q-badge{font-size:11px;color:var(--muted);background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:2px 7px}
+.q-status{margin-left:auto;display:flex;align-items:center;gap:6px;font-family:'Syne',sans-serif;font-size:12px;font-weight:700}
+.q-pts{font-size:11px;color:var(--muted)}
+
+.q-text{font-size:15px;font-weight:500;line-height:1.58;margin-bottom:14px}
+
+.ans-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:10px}
+@media(max-width:560px){.ans-grid{grid-template-columns:1fr}}
+.ans-box{background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:11px 13px}
+.ans-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;font-family:'Syne',sans-serif;display:flex;align-items:center;gap:6px}
+.ans-lbl.my{color:var(--muted)}.ans-lbl.cor{color:var(--ok)}
+.ans-val{font-size:13px;line-height:1.5}
+.ans-val.open-text{font-style:italic;color:#c4c8e0}
+
+/* single answer – full width */
+.ans-single{background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:11px 13px;margin-bottom:10px}
+
+/* per-question teacher comment */
+.q-teacher-note{margin-top:9px;padding:9px 12px;background:rgba(129,140,248,.06);border:1px solid rgba(129,140,248,.18);border-radius:7px;font-size:13px;color:#c7c9f5;line-height:1.55;display:flex;align-items:flex-start;gap:8px}
+.q-teacher-note::before{content:'💬';flex-shrink:0;font-size:14px}
+
+/* flag badge */
+.flag-badge{font-size:11px;color:var(--half);display:flex;align-items:center;gap:4px}
+
+/* summary chips */
+.summary-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:22px}
+.sum-chip{display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:9px;font-size:13px;font-weight:500;border:1px solid var(--border)}
+.sum-chip.correct{background:var(--ok-l);border-color:var(--ok-b);color:var(--ok)}
+.sum-chip.wrong{background:var(--err-l);border-color:var(--err-b);color:var(--err)}
+.sum-chip.half{background:var(--half-l);border-color:rgba(234,179,8,.3);color:var(--half)}
+.sum-chip.open{background:var(--accent-l);border-color:rgba(129,140,248,.3);color:var(--accent)}
+.sum-chip.empty{background:var(--card2);color:var(--muted)}
+
+/* ══ GRADE COLORS ══ */
+.g1{color:#22c55e}.g1m{color:#4ade80}.g2p{color:#86efac}.g2{color:#60a5fa}
+.g2m{color:#93c5fd}.g3p{color:#a5b4fc}.g3{color:#f97316}.g3m{color:#fb923c}
+.g4p{color:#fbbf24}.g4{color:#fcd34d}.g4m{color:#fde68a}
+.g5p{color:#fca5a5}.g5{color:#f87171}.g5m{color:#ef4444}.g6{color:#dc2626}
+
+@media(max-width:580px){
+  .drop-card{padding:36px 22px}
+  .hero-card{padding:22px}
+  .hero-ring{width:90px;height:90px}
+  .hero-pct{font-size:18px}
+  .hero-grade{font-size:32px}
+}
+</style>
+</head>
+<body>
+
+<!-- ══ DROP ══ -->
+<div id="screen-drop" class="screen active">
+  <div class="drop-card">
+    <div class="brand">WPU · 3D-Druck</div>
+    <h1>Deine<br><em>Korrektur</em></h1>
+    <p class="sub">Lade deine korrigierte Bewertungsdatei, die du von deiner Lehrkraft erhalten hast, um deine Ergebnisse einzusehen.</p>
+    <div class="drop-zone" id="drop-zone">
+      <span class="dz-icon">📋</span>
+      <div class="dz-title">Datei hierher ziehen</div>
+      <div class="dz-sub">oder klicken zum Auswählen<br><code style="font-size:11px;color:var(--accent)">korrektur_name_klasse_datum.lk.enc</code></div>
+      <input type="file" accept=".lk.enc,.json" onchange="loadFile(this.files[0])">
+    </div>
+    <div class="dz-hint">
+      🔒 Deine Datei ist mit <strong>AES-256</strong> verschlüsselt. Das Passwort erhältst du von deiner Lehrkraft. Die Datei enthält ausschließlich <strong>deine eigenen</strong> Daten — keine anderen Schülerdaten.
+    </div>
+  </div>
+</div>
+
+<!-- ══ RESULT ══ -->
+<div id="screen-result" class="screen">
+  <div class="topbar">
+    <div class="tb-brand">WPU 3D-Druck · <span>Meine Korrektur</span></div>
+    <div class="tb-name" id="tb-name"></div>
+    <div class="tb-space"></div>
+    <button class="tb-back" onclick="goBack()">↺ Andere Datei laden</button>
+  </div>
+  <div class="result-body" id="result-body"></div>
+</div>
+
+<script>
+// ══════════════════════════════════════════
+// AES-256-GCM DECRYPTION (Web Crypto API)
+// ══════════════════════════════════════════
+const ENC_MAGIC = 'LKENC1:';
+
+async function deriveKey(password, salt) {
+  const enc = new TextEncoder();
+  const km = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name:'PBKDF2', salt, iterations:310000, hash:'SHA-256' },
+    km, { name:'AES-GCM', length:256 }, false, ['decrypt']
+  );
+}
+
+// Uint8Array sicher zu Base64 (kein Stack Overflow bei großen Daten)
+function fromBase64(b64) {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+async function decryptFile(raw, password) {
+  if (!raw.startsWith(ENC_MAGIC)) return JSON.parse(raw); // plain JSON
+  const bytes = fromBase64(raw.slice(ENC_MAGIC.length));
+  const salt = bytes.slice(0, 16), iv = bytes.slice(16, 28), ct = bytes.slice(28);
+  const key = await deriveKey(password, salt);
+  try {
+    const plain = await crypto.subtle.decrypt({ name:'AES-GCM', iv }, key, ct);
+    return JSON.parse(new TextDecoder().decode(plain));
+  } catch {
+    throw new Error('Falsches Passwort oder beschädigte Datei.');
+  }
+}
+
+// ══════════════════════════════════════════
+// GRADE TABLE
+// ══════════════════════════════════════════
+const GT = [
+  {min:96,g:'1',   cls:'g1' },{min:92,g:'1−',cls:'g1m'},
+  {min:88,g:'2+',cls:'g2p'},{min:85,g:'2',   cls:'g2' },
+  {min:80,g:'2−',cls:'g2m'},{min:75,g:'3+',cls:'g3p'},
+  {min:70,g:'3',   cls:'g3' },{min:65,g:'3−',cls:'g3m'},
+  {min:60,g:'4+',cls:'g4p'},{min:55,g:'4',   cls:'g4' },
+  {min:50,g:'4−',cls:'g4m'},{min:37,g:'5+',cls:'g5p'},
+  {min:25,g:'5',   cls:'g5' },{min:13,g:'5−',cls:'g5m'},
+  {min:0, g:'6',   cls:'g6' },
+];
+const GRADE_DESC = {
+  '1':'Sehr gut','1−':'Sehr gut (−)','2+':'Gut (+)','2':'Gut','2−':'Gut (−)',
+  '3+':'Befriedigend (+)','3':'Befriedigend','3−':'Befriedigend (−)',
+  '4+':'Ausreichend (+)','4':'Ausreichend','4−':'Ausreichend (−)',
+  '5+':'Mangelhaft (+)','5':'Mangelhaft','5−':'Mangelhaft (−)','6':'Ungenügend'
+};
+
+function grade(pct) { return GT.find(r=>pct>=r.min) || GT[GT.length-1]; }
+
+const MC = {PLA:'#4ade80',PETG:'#60a5fa','ABS/ASA':'#fb923c',PC:'#c084fc',PET:'#34d399',TPU:'#f472b6'};
+const MB = {PLA:'rgba(74,222,128,.1)',PETG:'rgba(96,165,250,.1)','ABS/ASA':'rgba(251,146,60,.1)',PC:'rgba(192,132,252,.1)',PET:'rgba(52,211,153,.1)',TPU:'rgba(244,114,182,.1)'};
+
+// ══════════════════════════════════════════
+// DRAG & DROP
+// ══════════════════════════════════════════
+const dz = document.getElementById('drop-zone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag'); loadFile(e.dataTransfer.files[0]); });
+
+function goBack() {
+  document.getElementById('screen-result').classList.remove('active');
+  document.getElementById('screen-drop').classList.add('active');
+}
+
+// ══════════════════════════════════════════
+// LOAD
+// ══════════════════════════════════════════
+function loadFile(file) {
+  if (!file) return;
+  const r = new FileReader();
+  r.onload = async e => {
+    // ArrayBuffer lesen → rohe Bytes, keine Kodierungsprobleme auf GitHub Pages
+    const arrayBuf = e.target.result;
+    const bytes    = new Uint8Array(arrayBuf);
+    // Als UTF-8 Text dekodieren
+    const raw = new TextDecoder('utf-8').decode(bytes).trim();
+    let data;
+    try {
+      if (raw.startsWith(ENC_MAGIC)) {
+        const pw = await promptDecryptPw();
+        if (pw === null) return;
+        try {
+          data = await decryptFile(raw, pw);
+        } catch {
+          alert('Falsches Passwort. Bitte frag deine Lehrkraft nach dem richtigen Passwort.');
+          return;
+        }
+      } else {
+        data = JSON.parse(raw);
+      }
+      if (!data.student || !data.exam) {
+        alert('Diese Datei ist keine gültige Korrekturdatei.\nBitte lade die Datei, die du von deiner Lehrkraft erhalten hast.');
+        return;
+      }
+      render(data);
+    } catch {
+      alert('Die Datei konnte nicht gelesen werden. Stelle sicher, dass es eine gültige .lk.enc- oder .json-Datei ist.');
+    }
+  };
+  r.readAsArrayBuffer(file);
+}
+
+function promptDecryptPw() {
+  return new Promise(resolve => {
+    // simple inline prompt using a modal
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:999;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:24px';
+    overlay.innerHTML = `
+      <div style="background:#13151e;border:1px solid #262a3a;border-radius:16px;padding:36px;max-width:380px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.6)">
+        <div style="font-size:32px;margin-bottom:14px">🔓</div>
+        <h2 style="font-family:'Syne',sans-serif;font-size:19px;font-weight:800;margin-bottom:8px">Datei entschlüsseln</h2>
+        <p style="color:#6b7191;font-size:14px;margin-bottom:20px">Gib das Passwort ein, das dir deine Lehrkraft mitgeteilt hat.</p>
+        <div style="display:flex;gap:8px">
+          <input id="_dec_pw" type="password" placeholder="Passwort" style="flex:1;background:#191c27;border:1.5px solid #262a3a;border-radius:8px;padding:11px 13px;font-size:15px;color:#e4e7f5;font-family:'Instrument Sans',sans-serif">
+          <button id="_dec_ok" style="padding:11px 18px;border-radius:8px;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;background:#818cf8;color:#fff;border:none;cursor:pointer">→</button>
+        </div>
+        <div id="_dec_err" style="color:#ef4444;font-size:13px;margin-top:10px;min-height:18px"></div>
+        <button id="_dec_cancel" style="background:none;border:none;color:#6b7191;font-size:13px;cursor:pointer;margin-top:12px;text-decoration:underline">Abbrechen</button>
+      </div>`;
+    document.body.appendChild(overlay);
+    const inp = overlay.querySelector('#_dec_pw');
+    inp.focus();
+    const done = val => { document.body.removeChild(overlay); resolve(val); };
+    overlay.querySelector('#_dec_ok').onclick = () => {
+      if (!inp.value) { overlay.querySelector('#_dec_err').textContent = 'Bitte Passwort eingeben.'; return; }
+      done(inp.value);
+    };
+    overlay.querySelector('#_dec_cancel').onclick = () => done(null);
+    inp.onkeydown = e => { if (e.key==='Enter') overlay.querySelector('#_dec_ok').click(); };
+  });
+}
+
+// ══════════════════════════════════════════
+// RENDER
+// ══════════════════════════════════════════
+function render(data) {
+  const st  = data.student;
+  const res = data.result;
+  const qs  = data.exam.questions;
+  const flagged = data.exam.flaggedQuestions || [];
+
+  const pct   = res.percentageTotal ?? 0;
+  const gr    = grade(pct);
+  const circ  = 2 * Math.PI * 44;
+  const offset = circ - (pct / 100) * circ;
+
+  // topbar name
+  document.getElementById('tb-name').textContent = `${st.vorname} ${st.nachname} · Klasse ${st.klasse}`;
+
+  // count results
+  let nCorrect=0, nWrong=0, nHalf=0, nOpen=0, nEmpty=0;
+  qs.forEach(q => {
+    if (!q.studentAnswer) { nEmpty++; return; }
+    if (q.type === 'open') {
+      if (q.teacherMark === 'ok')   nCorrect++;
+      else if (q.teacherMark === 'half') nHalf++;
+      else if (q.teacherMark === 'wrong') nWrong++;
+      else nOpen++;
+    } else {
+      if (q.autoCorrect) nCorrect++; else nWrong++;
+    }
+  });
+
+  // ── HERO ──
+  let h = `<div class="hero-card">
+    <div class="hero-ring">
+      <svg viewBox="0 0 100 100" width="110" height="110">
+        <circle class="ring-bg" cx="50" cy="50" r="44"/>
+        <circle class="ring-fill" cx="50" cy="50" r="44"
+          stroke-dasharray="${circ.toFixed(1)}"
+          stroke-dashoffset="${circ.toFixed(1)}"
+          id="ring-anim"
+          stroke="${getComputedStyle(document.documentElement).getPropertyValue('--ok')||'#22c55e'}"
+          style="stroke:var(--ok)"/>
+      </svg>
+      <div class="hero-center">
+        <div class="hero-pct">${pct}%</div>
+        <div class="hero-pts">${res.totalPoints}/${res.maxPoints} Pkt.</div>
+      </div>
+    </div>
+    <div class="hero-info">
+      <div class="hero-name">${st.vorname} ${st.nachname}</div>
+      <div class="hero-meta">Klasse ${st.klasse} · ${new Date(data.meta.timestamp).toLocaleDateString('de-DE')}</div>
+      <div class="hero-grade-wrap">
+        <div class="hero-grade ${gr.cls}">${gr.g}</div>
+        <div class="hero-grade-label">
+          <span class="grade-desc">${GRADE_DESC[gr.g] || ''}</span>
+          <span>${res.autoPoints} Pkt. automatisch · ${res.manualPoints} Pkt. manuell</span>
+        </div>
+      </div>
+      <div class="prog-row">
+        <div class="prog-label"><span>Ergebnis</span><span>${pct}%</span></div>
+        <div class="prog-track"><div class="prog-fill" id="prog-fill" style="width:0%;background:var(--ok)"></div></div>
+      </div>
+    </div>
+  </div>`;
+
+  // animate ring + bar after render
+  setTimeout(() => {
+    const ring = document.getElementById('ring-anim');
+    if (ring) ring.style.strokeDashoffset = offset.toFixed(1);
+    const bar  = document.getElementById('prog-fill');
+    if (bar)  bar.style.width = pct + '%';
+  }, 80);
+
+  // ── GLOBAL TEACHER COMMENT ──
+  if (res.teacherComment) {
+    h += `<div class="teacher-comment-box">
+      <div class="tcb-label">💬 Rückmeldung deiner Lehrkraft</div>
+      <div class="tcb-text">${escHtml(res.teacherComment)}</div>
+    </div>`;
+  }
+
+  // ── SUMMARY CHIPS ──
+  h += `<div class="summary-row">
+    ${nCorrect ? `<div class="sum-chip correct">✓ ${nCorrect} Richtig</div>` : ''}
+    ${nHalf    ? `<div class="sum-chip half">½ ${nHalf} Teilrichtig</div>` : ''}
+    ${nWrong   ? `<div class="sum-chip wrong">✗ ${nWrong} Falsch</div>` : ''}
+    ${nOpen    ? `<div class="sum-chip open">○ ${nOpen} nicht bewertet</div>` : ''}
+    ${nEmpty   ? `<div class="sum-chip empty">– ${nEmpty} nicht beantwortet</div>` : ''}
+  </div>`;
+
+  // ── QUESTIONS ──
+  h += `<div class="section-hdr">Deine Antworten im Überblick</div>`;
+
+  qs.forEach((q, idx) => {
+    // determine status
+    let cardCls = 'q-empty', statusHtml = '', ptsHtml = '';
+
+    if (!q.studentAnswer) {
+      cardCls = 'q-empty';
+      statusHtml = `<span style="color:var(--muted)">– Nicht beantwortet</span>`;
+      ptsHtml = '0 Pkt.';
+    } else if (q.type === 'open') {
+      const m = q.teacherMark;
+      if (m === 'ok')   { cardCls='q-correct'; statusHtml=`<span style="color:var(--ok)">✓ Richtig</span>`; ptsHtml='1 Pkt.'; }
+      else if (m==='half') { cardCls='q-half'; statusHtml=`<span style="color:var(--half)">½ Teilrichtig</span>`; ptsHtml='0,5 Pkt.'; }
+      else if (m==='wrong'){ cardCls='q-wrong'; statusHtml=`<span style="color:var(--err)">✗ Falsch</span>`; ptsHtml='0 Pkt.'; }
+      else { cardCls='q-open'; statusHtml=`<span style="color:var(--accent)">○ Bewertet</span>`; ptsHtml='–'; }
+    } else {
+      if (q.autoCorrect) { cardCls='q-correct'; statusHtml=`<span style="color:var(--ok)">✓ Richtig</span>`; ptsHtml='1 Pkt.'; }
+      else               { cardCls='q-wrong';   statusHtml=`<span style="color:var(--err)">✗ Falsch</span>`;   ptsHtml='0 Pkt.'; }
+    }
+
+    const isFlagged = flagged.includes(idx);
+    const mc = MC[q.material]||'#aaa', mb = MB[q.material]||'rgba(170,170,170,.1)';
+
+    h += `<div class="q-card ${cardCls}" style="animation-delay:${idx*0.03}s">
+      <div class="q-top">
+        <span class="q-num">Frage ${q.index}</span>
+        <span class="q-mat" style="color:${mc};background:${mb};border:1px solid ${mc}44">${q.material}</span>
+        <span class="q-badge">${q.category}</span>
+        ${isFlagged ? '<span class="flag-badge">⚑ von dir markiert</span>' : ''}
+        <div class="q-status">${statusHtml}<span class="q-pts">${ptsHtml}</span></div>
+      </div>
+      <div class="q-text">${escHtml(q.questionText)}</div>`;
+
+    // answers
+    if (!q.studentAnswer) {
+      h += `<div class="ans-single"><div class="ans-lbl my">Deine Antwort</div><div class="ans-val" style="color:var(--muted);font-style:italic">Keine Antwort gegeben</div></div>`;
+    } else if (q.type === 'open') {
+      // only show student answer + teacher comment — NO sample answer
+      h += `<div class="ans-single">
+        <div class="ans-lbl my">Deine Antwort</div>
+        <div class="ans-val open-text">${escHtml(typeof q.studentAnswer==='string'?q.studentAnswer:JSON.stringify(q.studentAnswer))}</div>
+      </div>`;
+    } else {
+      // show student answer AND correct answer side by side
+      h += `<div class="ans-grid">
+        <div class="ans-box">
+          <div class="ans-lbl my">Deine Antwort</div>
+          <div class="ans-val">${fmtStudentAns(q)}</div>
+        </div>`;
+      if (!q.autoCorrect) {
+        // only show correct answer if wrong (learning opportunity)
+        h += `<div class="ans-box" style="border-color:var(--ok-b);background:var(--ok-l)">
+          <div class="ans-lbl cor">✓ Richtige Antwort</div>
+          <div class="ans-val">${fmtCorrectAns(q)}</div>
+        </div>`;
+      } else {
+        h += `<div class="ans-box" style="border-color:var(--ok-b);background:var(--ok-l)">
+          <div class="ans-lbl cor">✓ Korrekt!</div>
+          <div class="ans-val" style="color:var(--ok)">${fmtStudentAns(q)}</div>
+        </div>`;
+      }
+      h += `</div>`;
+    }
+
+    // teacher comment on this question (if any) — NO sample answer
+    if (q.teacherComment) {
+      h += `<div class="q-teacher-note">${escHtml(q.teacherComment)}</div>`;
+    }
+
+    h += `</div>`;
+  });
+
+  document.getElementById('result-body').innerHTML = h;
+  document.getElementById('screen-drop').classList.remove('active');
+  document.getElementById('screen-result').classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ══════════════════════════════════════════
+// FORMAT HELPERS
+// ══════════════════════════════════════════
+function escHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function fmtStudentAns(q) {
+  const a = q.studentAnswer;
+  if (!a) return '<em style="color:var(--muted)">–</em>';
+  if (typeof a === 'string') return escHtml(a);
+  if (Array.isArray(a)) {
+    if (typeof a[0] === 'string') return a.map(escHtml).join('<br>');
+    return a.map(s => `<span style="display:block">${escHtml(s.term)} → ${escHtml(s.chosen)}</span>`).join('');
+  }
+  return escHtml(JSON.stringify(a));
+}
+
+function fmtCorrectAns(q) {
+  const c = q.correctAnswer;
+  if (!c) return '–';
+  if (typeof c === 'string') return escHtml(c);
+  if (Array.isArray(c)) {
+    if (typeof c[0] === 'string') return c.map(escHtml).join('<br>');
+    return c.map(p => `<span style="display:block">${escHtml(p.term)} → ${escHtml(p.correct)}</span>`).join('');
+  }
+  return '–';
+}
+</script>
+</body>
+</html>
