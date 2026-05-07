@@ -236,21 +236,32 @@ async function decryptFile(raw, password) {
 // ══════════════════════════════════════════
 // GRADE TABLE
 // ══════════════════════════════════════════
+// Notentabelle nach Fehlerpunkten (20 Punkte gesamt)
 const GT = [
-  {min:96,g:'1',   cls:'g1' },{min:92,g:'1−',cls:'g1m'},
-  {min:88,g:'2+',cls:'g2p'},{min:85,g:'2',   cls:'g2' },
-  {min:80,g:'2−',cls:'g2m'},{min:75,g:'3+',cls:'g3p'},
-  {min:70,g:'3',   cls:'g3' },{min:65,g:'3−',cls:'g3m'},
-  {min:60,g:'4+',cls:'g4p'},{min:55,g:'4',   cls:'g4' },
-  {min:50,g:'4−',cls:'g4m'},{min:37,g:'5+',cls:'g5p'},
-  {min:25,g:'5',   cls:'g5' },{min:13,g:'5−',cls:'g5m'},
-  {min:0, g:'6',   cls:'g6' },
+  {min:97,g:'1+', cls:'g1' },
+  {min:90,g:'1',  cls:'g1m'},
+  {min:85,g:'1-', cls:'g2p'},
+  {min:77,g:'2+', cls:'g2' },
+  {min:70,g:'2',  cls:'g2m'},
+  {min:65,g:'2-', cls:'g3p'},
+  {min:57,g:'3+', cls:'g3' },
+  {min:50,g:'3',  cls:'g3m'},
+  {min:45,g:'3-', cls:'g4p'},
+  {min:37,g:'4+', cls:'g4' },
+  {min:30,g:'4',  cls:'g4m'},
+  {min:25,g:'4-', cls:'g5p'},
+  {min:17,g:'5+', cls:'g5' },
+  {min:10,g:'5',  cls:'g5m'},
+  {min:5, g:'5-', cls:'g6' },
+  {min:0, g:'6',  cls:'g6' },
 ];
 const GRADE_DESC = {
-  '1':'Sehr gut','1−':'Sehr gut (−)','2+':'Gut (+)','2':'Gut','2−':'Gut (−)',
-  '3+':'Befriedigend (+)','3':'Befriedigend','3−':'Befriedigend (−)',
-  '4+':'Ausreichend (+)','4':'Ausreichend','4−':'Ausreichend (−)',
-  '5+':'Mangelhaft (+)','5':'Mangelhaft','5−':'Mangelhaft (−)','6':'Ungenügend'
+  '1+':'Sehr gut','1':'Sehr gut','1-':'Sehr gut',
+  '2+':'Gut','2':'Gut','2-':'Gut',
+  '3+':'Befriedigend','3':'Befriedigend','3-':'Befriedigend',
+  '4+':'Ausreichend','4':'Ausreichend','4-':'Ausreichend',
+  '5+':'Mangelhaft','5':'Mangelhaft','5-':'Mangelhaft',
+  '6':'Ungenügend',
 };
 
 function grade(pct) { return GT.find(r=>pct>=r.min) || GT[GT.length-1]; }
